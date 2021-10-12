@@ -73,8 +73,7 @@ add_node_status = function(fileset_db) {
 }
 
 
-download_from_fileset = function(fileset_db, parallel = TRUE) {
-
+download_from_fileset = function(fileset_db, cores = 0) {
 
   if("node_status" %in% names(fileset_db))  {
     fileset_db = fileset_db[node_status == "UP" & is.na(downloaded)]
@@ -84,10 +83,10 @@ download_from_fileset = function(fileset_db, parallel = TRUE) {
 
 
   for (path in unique(dirname(destination_paths))) {
-    dir.create(path, recursive = TRUE)
+    try(dir.create(path, recursive = TRUE))
   }
 
-  if (parallel) plan(multicore)
+  if (cores > 0) plan(multisession, workers = cores)
 
   progressr::with_progress(download_status <-
                              download_files(urls_to_dl, destination_paths))
@@ -98,23 +97,28 @@ download_from_fileset = function(fileset_db, parallel = TRUE) {
 download_files = function(urls_to_dl, destination_paths) {
   seqs = 1:length(urls_to_dl)
   p = progressr::progressor(along = seqs)
-  options(timeout = max(600, getOption("timeout")))
+  options(timeout = max(300, getOption("timeout")))
 
-  ret = sapply(seqs, function(i) {
-    res = try(download.file(
-      urls_to_dl[i],
-      destination_paths[i],
-      method = "libcurl",
-      mode = "wb"
-    ),
-    silent = TRUE)
-    if (inherits(res, "try-error")) {
-      p(message = paste("Error", urls_to_dl[i]),
-        class = "sticky")
-      return(1)
-    } else {
-      p(message = basename(urls_to_dl[i]), class = "sticky")
-      return(0)
-    }
-  })
+  ret = future.apply::future_sapply(seqs, function(i) {
+    res = tryCatch(
+      {
+      download.file(
+        urls_to_dl[i],
+        destination_paths[i],
+        method = "auto",
+        mode = "wb")
+      p(message = paste(destination_paths[i]), class = "sticky", amount = 10)
+      },
+      error = function(cond) {
+        message(paste("URL", urls_to_dl[i]))
+        p(message = paste("Error", cond), class = "sticky" ,amount = 0)
+        return(1)
+      }, warning =  function(cond) {
+        p(message = paste(cond), class = "sticky", amount = 0)
+        return(1)
+      }, finally = {
+
+      }
+    )}
+  )
 }
