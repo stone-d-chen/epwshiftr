@@ -107,7 +107,7 @@ download_files = function(urls_to_dl, destination_paths) {
           destination_paths[i],
           method = "curl",
           mode = "wb",
-          silent = TRUE)
+          quiet = TRUE)
         p(message = basename(destination_paths[i]), class = "sticky", amount = 1)
       },
       error = function(cond) {
