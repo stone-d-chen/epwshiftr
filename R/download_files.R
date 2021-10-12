@@ -102,12 +102,12 @@ download_files = function(urls_to_dl, destination_paths) {
   ret = future.apply::future_sapply(seqs, function(i) {
     res = tryCatch(
       {
-      download.file(
-        urls_to_dl[i],
-        destination_paths[i],
-        method = "auto",
-        mode = "wb")
-      p(message = paste(destination_paths[i]), class = "sticky", amount = 10)
+        download.file(
+          urls_to_dl[i],
+          destination_paths[i],
+          method = "curl",
+          mode = "wb")
+        p(message = basename(destination_paths[i]), class = "sticky", amount = 10)
       },
       error = function(cond) {
         message(paste("URL", urls_to_dl[i]))
