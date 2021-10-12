@@ -83,7 +83,7 @@ download_from_fileset = function(fileset_db, cores = 0) {
 
 
   for (path in unique(dirname(destination_paths))) {
-    try(dir.create(path, recursive = TRUE))
+    dir.create(path, recursive = TRUE, showWarnings = FALSE)
   }
 
   if (cores > 0) plan(multisession, workers = cores)
@@ -106,12 +106,13 @@ download_files = function(urls_to_dl, destination_paths) {
           urls_to_dl[i],
           destination_paths[i],
           method = "curl",
-          mode = "wb")
-        p(message = basename(destination_paths[i]), class = "sticky", amount = 10)
+          mode = "wb",
+          silent = TRUE)
+        p(message = basename(destination_paths[i]), class = "sticky", amount = 1)
       },
       error = function(cond) {
         message(paste("URL", urls_to_dl[i]))
-        p(message = paste("Error", cond), class = "sticky" ,amount = 0)
+        p(message = paste("Error", cond), class = "sticky", amount = 0)
         return(1)
       }, warning =  function(cond) {
         p(message = paste(cond), class = "sticky", amount = 0)
