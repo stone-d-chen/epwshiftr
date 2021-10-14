@@ -28,6 +28,7 @@ merge_files_in_dataset = function(dataset_name, file_paths) {
     list_stars = lapply(file_paths,  stars::read_ncdf)
     merged_star = do.call(c, list_stars)
   }
+
   merged_stars = lapply(dataset_list, read_merge_ncdf)
 
   names(merged_stars) = names(dataset_list)

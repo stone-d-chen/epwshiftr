@@ -55,16 +55,16 @@ get_node_status = function (speed_test = FALSE, timeout = 3)
 
 
 create_fileset_destinations = function(fileset_db) {
-  fileset_db$file_paths = paste("data",
-                                fileset_db$variable_id,
-                                fileset_db$source_id,
-                                fileset_db$experiment_id,
-                                fileset_db$member_id,
-                                basename(fileset_db$file_url),
-                                sep = "/")
-  fileset_db$downloaded = NA
-
-  return(fileset_db)
+  paths = paste("data",
+                fileset_db$variable_id,
+                fileset_db$source_id,
+                fileset_db$experiment_id,
+                fileset_db$member_id,
+                basename(fileset_db$file_url),
+                sep = "/")
+  downloaded = "FALSE"
+  fileset_db[, file_paths := paths]
+  fileset_db[, downloaded := "FALSE"]
 }
 
 add_node_status = function(fileset_db) {
@@ -73,53 +73,80 @@ add_node_status = function(fileset_db) {
 }
 
 
-download_from_fileset = function(fileset_db, cores = 0) {
+download_from_fileset = function(fileset_db, cores = 0, method = "libcurl") {
 
   if("node_status" %in% names(fileset_db))  {
-    fileset_db = fileset_db[node_status == "UP" & is.na(downloaded)]
+    files_to_dl = fileset_db[node_status == "UP" & downloaded == "FALSE", ]
   }
-  urls_to_dl = fileset_db$file_url
-  destination_paths = fileset_db$file_paths
+
+  nodes_to_check = files_to_dl[!duplicated(data_node), .(data_node, file_url, file_paths)]
+
+  for (path in unique(dirname(nodes_to_check$file_paths))) {
+    dir.create(path, recursive = TRUE, showWarnings = FALSE)
+  }
+
+  try_download = function(file_url, file_paths, method) {
+    tryCatch(
+      {
+        download.file(file_url, file_paths, method)
+        return("downloaded")
+      },
+      error = function(error) message(error),
+      warning = function(warning) return(list(warning))
+    )
+  }
+
+  options(timeout = max(600, getOption("timeout")))
+  status = future_mapply(try_download, nodes_to_check$file_url, nodes_to_check$file_paths)
+
+  nodes_to_check$status = sapply(status, function(node_status) {
+      if (node_status[1] == "downloaded") return("success")
+      else {"error/warn"}
+     }
+  )
+
+  files_to_dl[nodes_to_check[, .(data_node, status)], on = c("data_node"), dl_check := i.status]
+  files_to_dl = files_to_dl[dl_check == "success"]
 
 
-  for (path in unique(dirname(destination_paths))) {
+
+  for (path in unique(dirname(files_to_dl$file_paths))) {
     dir.create(path, recursive = TRUE, showWarnings = FALSE)
   }
 
   if (cores > 0) plan(multisession, workers = cores)
 
-  progressr::with_progress(download_status <-
-                             download_files(urls_to_dl, destination_paths))
-  download_status
-
+  download_status <- download_files(files_to_dl$file_url, files_to_dl$file_paths)
+  files_to_dl$downloaded = c("TRUE", "FALSE")[download_status + 1]
+  fileset_db[files_to_dl[,c("dataset_id", "downloaded")], by = ("dataset_id"), downloaded := i.downloaded]
 }
 
-download_files = function(urls_to_dl, destination_paths) {
-  seqs = 1:length(urls_to_dl)
-  p = progressr::progressor(along = seqs)
-  options(timeout = max(300, getOption("timeout")))
+download_files = function(urls_to_dl, destination_paths, method = "libcurl") {
 
-  ret = future.apply::future_sapply(seqs, function(i) {
-    res = tryCatch(
-      {
-        download.file(
-          urls_to_dl[i],
-          destination_paths[i],
-          method = "curl",
-          mode = "wb",
-          quiet = TRUE)
-        p(message = basename(destination_paths[i]), class = "sticky", amount = 1)
-      },
-      error = function(cond) {
-        message(paste("URL", urls_to_dl[i]))
-        p(message = paste("Error", cond), class = "sticky", amount = 0)
-        return(1)
-      }, warning =  function(cond) {
-        p(message = paste(cond), class = "sticky", amount = 0)
-        return(1)
-      }, finally = {
+  try_download =  function(urls_to_dl, destination_path, method = method) {
+    p = progressr::progressor(along = urls_to_dl)
+    status = tryCatch(
+        {
+          download.file(urls_to_dl, destination_path, method = method, mode = "wb",
+                        quiet = FALSE)
+          p(message = basename(destination_paths[i]), class = "sticky" , amount = 1)
+          return(0)
+        },
+        error = function(e)
+          {
+            p(message = urls_to_dl, class = "sticky", amount = 1)
+            return(1)
+          },
+        warning =  function(w)
+          {
+            p(message = urls_to_dl, class = "sticky", amount = 1)
+            return(1)
+          }
+      )
+  }
 
-      }
-    )}
-  )
+  options(timeout = max(600, getOption("timeout")))
+  status = future.apply::future_mapply(try_download, urls_to_dl, destination_paths)
+
+
 }
