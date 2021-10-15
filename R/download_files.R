@@ -73,42 +73,43 @@ add_node_status = function(fileset_db) {
 }
 
 
-download_from_fileset = function(fileset_db, cores = 0, method = "libcurl") {
+download_from_fileset = function(fileset_db, cores = 0, method = "libcurl", further_check = FALSE) {
 
   if("node_status" %in% names(fileset_db))  {
     files_to_dl = fileset_db[node_status == "UP" & downloaded == "FALSE", ]
+  } else {
+    files_to_dl = fileset_db
   }
+  if(further_check == TRUE) {
+      nodes_to_check = files_to_dl[!duplicated(data_node), .(data_node, file_url, file_paths)]
 
-  nodes_to_check = files_to_dl[!duplicated(data_node), .(data_node, file_url, file_paths)]
+      for (path in unique(dirname(nodes_to_check$file_paths))) {
+        dir.create(path, recursive = TRUE, showWarnings = FALSE)
+      }
 
-  for (path in unique(dirname(nodes_to_check$file_paths))) {
-    dir.create(path, recursive = TRUE, showWarnings = FALSE)
+      try_download = function(file_url, file_paths, method) {
+        tryCatch(
+          {
+            download.file(file_url, file_paths, method)
+            return("downloaded")
+          },
+          error = function(error) message(error),
+          warning = function(warning) return(list(warning))
+        )
+      }
+
+      options(timeout = max(600, getOption("timeout")))
+      status = future_mapply(try_download, nodes_to_check$file_url, nodes_to_check$file_paths)
+
+      nodes_to_check$status = sapply(status, function(node_status) {
+          if (node_status[1] == "downloaded") return("success")
+          else {"error/warn"}
+         }
+      )
+
+      files_to_dl[nodes_to_check[, .(data_node, status)], on = c("data_node"), dl_check := i.status]
+      files_to_dl = files_to_dl[dl_check == "success"]
   }
-
-  try_download = function(file_url, file_paths, method) {
-    tryCatch(
-      {
-        download.file(file_url, file_paths, method)
-        return("downloaded")
-      },
-      error = function(error) message(error),
-      warning = function(warning) return(list(warning))
-    )
-  }
-
-  options(timeout = max(600, getOption("timeout")))
-  status = future_mapply(try_download, nodes_to_check$file_url, nodes_to_check$file_paths)
-
-  nodes_to_check$status = sapply(status, function(node_status) {
-      if (node_status[1] == "downloaded") return("success")
-      else {"error/warn"}
-     }
-  )
-
-  files_to_dl[nodes_to_check[, .(data_node, status)], on = c("data_node"), dl_check := i.status]
-  files_to_dl = files_to_dl[dl_check == "success"]
-
-
 
   for (path in unique(dirname(files_to_dl$file_paths))) {
     dir.create(path, recursive = TRUE, showWarnings = FALSE)
@@ -117,36 +118,38 @@ download_from_fileset = function(fileset_db, cores = 0, method = "libcurl") {
   if (cores > 0) plan(multisession, workers = cores)
 
   download_status <- download_files(files_to_dl$file_url, files_to_dl$file_paths)
-  files_to_dl$downloaded = c("TRUE", "FALSE")[download_status + 1]
-  fileset_db[files_to_dl[,c("dataset_id", "downloaded")], by = ("dataset_id"), downloaded := i.downloaded]
+  files_to_dl$downloaded = download_status
+  fileset_db[files_to_dl[,c("dataset_id", "downloaded")], on = ("dataset_id"), downloaded := i.downloaded]
 }
 
 download_files = function(urls_to_dl, destination_paths, method = "libcurl") {
 
-  try_download =  function(urls_to_dl, destination_path, method = method) {
-    p = progressr::progressor(along = urls_to_dl)
-    status = tryCatch(
+  p = progressor(along = urls_to_dl)
+  options(timeout = max(600, getOption("timeout")))
+
+  trycatch_download =  function(url, path, method = method) {
+    tryCatch(
         {
-          download.file(urls_to_dl, destination_path, method = method, mode = "wb",
-                        quiet = FALSE)
-          p(message = basename(destination_paths[i]), class = "sticky" , amount = 1)
-          return(0)
+          p(message = paste("starting", basename(path)), amount = 0)
+          Sys.sleep(0.1)
+          download.file(url, path, method = method, mode = "wb",
+                        quiet = TRUE)
+          p(message = basename(path), class = "sticky", amount = 1)
+          return("TRUE")
         },
         error = function(e)
           {
-            p(message = urls_to_dl, class = "sticky", amount = 1)
-            return(1)
+            p(message = e, class = "sticky")
+            return("FALSE")
           },
         warning =  function(w)
           {
-            p(message = urls_to_dl, class = "sticky", amount = 1)
-            return(1)
+            p(message = w$status, class = "sticky")
+            return("FALSE")
           }
       )
   }
 
-  options(timeout = max(600, getOption("timeout")))
-  status = future.apply::future_mapply(try_download, urls_to_dl, destination_paths)
-
+  status <- mapply(trycatch_download, urls_to_dl, destination_paths)
 
 }
