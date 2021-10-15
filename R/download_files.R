@@ -131,7 +131,7 @@ download_files = function(urls_to_dl, destination_paths, method = "libcurl") {
     tryCatch(
         {
           p(message = paste("starting", basename(path)), amount = 0)
-          Sys.sleep(0.1)
+          Sys.sleep(1)
           download.file(url, path, method = method, mode = "wb",
                         quiet = TRUE)
           p(message = basename(path), class = "sticky", amount = 1)
@@ -140,7 +140,6 @@ download_files = function(urls_to_dl, destination_paths, method = "libcurl") {
         error = function(e)
           {
             p(message = e, class = "sticky")
-            return("FALSE")
           },
         warning =  function(w)
           {
