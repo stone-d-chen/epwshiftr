@@ -12,13 +12,15 @@ source("R/esgf_query.R")
 filesets_ecearth = esgf_query(
     project = c("CMIP6"),
     variable = c("pr"),
-    source = c("EC-Earth3-Veg"),
-    variant = c("r10i1p1f1"),
+    source = NULL,
+    variant = NULL,
     experiment = c("historical"),
-    frequency = c("mon"),
+    frequency = c("mon", "ssp585"),
     resolution = NULL, # null means all, probably should change that
     type = "File"
 )
+
+filesets_ecearth=filesets_ecearth[data_node == "esgf.ichec.ie"][c(1,2)]
 
 filesets_2 = esgf_query(
     project = c("CMIP5"),
@@ -34,7 +36,7 @@ filesets_2 = esgf_query(
 filesets_canesm5 = esgf_query(
     project = c("CMIP6"),
     variable = c("pr", "tas"),
-    source = c("CanESM5"),
+    source = NULL,
     variant = c("r1i1p1f1"),
     experiment = c("historical", "ssp585"),
     frequency = c("mon"),
@@ -44,9 +46,9 @@ filesets_canesm5 = esgf_query(
 
 sum(filesets_canesm5$file_size)/1024/1024/1024 #filesize in gb
 
-create_fileset_destinations(filesets_canesm5) # creates a file structure
-add_node_status(filesets_canesm5) # to prevent attempting to download from servers which are down
-download_from_fileset(filesets_canesm5) # begin downloads; no parallel call
+create_fileset_destinations(filesets_ecearth) # creates a file structure
+add_node_status(filesets_ecearth) # to prevent attempting to download from servers which are down
+download_from_fileset(filesets_ecearth) # begin downloads; no parallel call
 
 #sometimes downloads will randomly fail (maybe too many connection to the server at that time)
 sum(filesets_canesm5$downloaded == "FALSE")
