@@ -20,12 +20,10 @@ merge_cdo = function(fileset_db, cores = 1) {
         output = names(files)[i]
         system2("cdo", args = c("mergetime", inputs, output))
     }
-
     files = split(fileset_db$file_paths, fileset_db$dataset_path)
     if(cores > 1) {
         cl = parallel::makeForkCluster(cores)
         res = parallel::parSapply(cl, seq_along(files), call_mergetime)
-        # parallel::stopCluster(cl)
     } else {
         res = sapply(seq_along(files), call_mergetime)
     }
@@ -34,16 +32,6 @@ merge_cdo = function(fileset_db, cores = 1) {
 
     #subset and merge result
 }
-
-
-fileset = data.table::fread("fileset_db.csv")
-# create_fileset_destinations(fileset)
-create_dataset_destinations(fileset)
-merge_cdo(fileset, cores = 26)
-# file.remove(fileset$dataset_path)
-
-fileset_db = fileset[dataset_path %in% paths[1:2], ]w
-dataset_db = fileset_db[!duplicated(dataset_path)][, file_paths := NULL]
 
 
 remapbil_cdo = function(dataset_db, grid = "r360x180", other_nc = NULL, cores = 1) {
@@ -59,7 +47,7 @@ remapbil_cdo = function(dataset_db, grid = "r360x180", other_nc = NULL, cores = 
         system2("cdo", args = c(remapbil, inputs[i], out_dest[i]))
     })
 
+    parallel::stopCluster(cl)
+
     dataset_db[, (grid) := ifelse(res == 0, out_dest, "FAIL")]
 }
-
-
