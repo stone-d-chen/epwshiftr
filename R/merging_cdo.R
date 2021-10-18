@@ -14,13 +14,16 @@ create_dataset_destinations = function(fileset_db) {
     fileset_db[, dataset_path := paths]
 }
 
-merge_cdo = function(fileset_db) {
+merge_cdo = function(fileset_db, cores = 1) {
+    cl = parallel::makeForkCluster(cores)
+
     files = split(fileset_db$file_paths, fileset_db$dataset_path)
-    res = sapply(seq_along(files), function(i) {
+    res = parallel::parSapply(cl, seq_along(files), function(i) {
         inputs = files[[i]]
         output = names(files)[i]
         system2("cdo", args = c("mergetime", inputs, output))
         # merge time will ask to over write, which may be annoying
+        # will auto abort after a certain time it seems?
     })
 
     fileset_db[, merged := res]
@@ -29,13 +32,10 @@ merge_cdo = function(fileset_db) {
 }
 
 
-
-
 fileset = data.table::fread("fileset_db.csv")
-create_fileset_destinations(fileset)
+# create_fileset_destinations(fileset)
 create_dataset_destinations(fileset)
-paths = unique(fileset$dataset_path)
-merge_cdo(fileset[dataset_path %in% paths[1:2]])
+merge_cdo(fileset, cores = 20)
 
 fileset_db = fileset[dataset_path %in% paths[1:2], ]
 dataset_db = fileset_db[!duplicated(dataset_path)][, file_paths := NULL]
