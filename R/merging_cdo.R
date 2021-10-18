@@ -15,16 +15,20 @@ create_dataset_destinations = function(fileset_db) {
 }
 
 merge_cdo = function(fileset_db, cores = 1) {
-    cl = parallel::makeForkCluster(cores)
-
-    files = split(fileset_db$file_paths, fileset_db$dataset_path)
-    res = parallel::parSapply(cl, seq_along(files), function(i) {
+    call_mergetime = function(i) {
         inputs = files[[i]]
         output = names(files)[i]
         system2("cdo", args = c("mergetime", inputs, output))
-        # merge time will ask to over write, which may be annoying
-        # will auto abort after a certain time it seems?
-    })
+    }
+
+    files = split(fileset_db$file_paths, fileset_db$dataset_path)
+    if(cores > 1) {
+        cl = parallel::makeForkCluster(cores)
+        res = parallel::parSapply(cl, seq_along(files), call_mergetime)
+        # parallel::stopCluster(cl)
+    } else {
+        res = sapply(seq_along(files), call_mergetime)
+    }
 
     fileset_db[, merged := res]
 
@@ -35,19 +39,23 @@ merge_cdo = function(fileset_db, cores = 1) {
 fileset = data.table::fread("fileset_db.csv")
 # create_fileset_destinations(fileset)
 create_dataset_destinations(fileset)
-merge_cdo(fileset, cores = 20)
+merge_cdo(fileset, cores = 26)
+# file.remove(fileset$dataset_path)
 
-fileset_db = fileset[dataset_path %in% paths[1:2], ]
+fileset_db = fileset[dataset_path %in% paths[1:2], ]w
 dataset_db = fileset_db[!duplicated(dataset_path)][, file_paths := NULL]
 
-remapbil_cdo = function(dataset_db, grid = "r360x180", other_nc = NULL) {
+
+remapbil_cdo = function(dataset_db, grid = "r360x180", other_nc = NULL, cores = 1) {
     if (!is.null(other_nc)) grid = other_nc
     inputs = dataset_db$dataset_path
     outname = paste("regrid", grid, basename(inputs), sep = "_")
     out_dest = paste(dirname(inputs), outname, sep = "/")
     remapbil = paste0("-remapbil,", grid)
 
-    res = sapply(seq_along(out_dest), function(i) {
+    cl = parallel::makeForkCluster(cores)
+
+    res = parallel::parSapply(cl, seq_along(out_dest), function(i) {
         system2("cdo", args = c(remapbil, inputs[i], out_dest[i]))
     })
 
