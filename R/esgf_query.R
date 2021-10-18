@@ -157,7 +157,7 @@
             "variable_units", "data_node")]
         lapply(l, unlist)
       }))
-      data.table::setnames(dt, c("id", "pid"), c("dataset_id", "dataset_pid"), skip_absent = TRUE)
+      data.table::setnames(dt, c("id", "pid", "variable", "model", "experiment", "ensemble"), c("dataset_id", "dataset_pid", "variable_id", "source_id", "experiment_id", "member_id"), skip_absent = TRUE)
       dt = dt[dt[["variable"]] == variable_name]
     }
     dt
@@ -219,7 +219,7 @@
       dt_file <-
         data.table::rbindlist(lapply(q$response$docs, function (l) {
           l <-
-            l[c("id", "dataset_id", "project",
+            l[c("id", "dataset_id", "project","model",
               "institute", "experiment",
               "ensemble", "time_frequency",
               "version", "variable", "variable_units", "data_node",
@@ -235,8 +235,8 @@
 
       dt_file[, c("datetime_start", "datetime_end") := parse_file_date(id, time_frequency)]
       dt_file[, url := gsub("\\|.+$", "", url)]
-      data.table::setnames(dt_file, c("id", "size", "url"),
-                           c("file_id", "file_size", "file_url"))
+      data.table::setnames(dt_file, c("id", "size", "url", "experiment", "ensemble", "variable", "model"),
+                           c("file_id", "file_size", "file_url", "experiment_id", "member_id", "variable_id", "source_id"))
     }
 
     return(dt_file[])

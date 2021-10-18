@@ -49,15 +49,3 @@ sum(filesets_canesm5$file_size)/1024/1024/1024 #filesize in gb
 create_fileset_destinations(filesets_ecearth) # creates a file structure
 add_node_status(filesets_ecearth) # to prevent attempting to download from servers which are down
 download_from_fileset(filesets_ecearth) # begin downloads; no parallel call
-
-#sometimes downloads will randomly fail (maybe too many connection to the server at that time)
-sum(filesets_canesm5$downloaded == "FALSE")
-# if so, re-attempt to download by re-running
-# it should just re-attempt to download the missing files
-download_from_fileset(filesets_canesm5)
-
-
-# create_fileset_destinations(filesets_ecearth) # creates a file structure
-# add_node_status(filesets_ecearth) # to prevent attempting to download from servers which are down
-# download_from_fileset(filesets_ecearth) # begin downloads; no parallel call
-#
