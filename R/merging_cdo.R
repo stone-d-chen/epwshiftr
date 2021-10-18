@@ -10,7 +10,6 @@ create_dataset_destination = function(fileset_db) {
                   fileset_db$source_id,
                   fileset_db$experiment_id,
                   fileset_db$member_id,
-                  fileset_db$dataset_name,
                   dataset_name,
                   sep = "/")
     fileset_db[, dataset_path := paths]
