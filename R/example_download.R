@@ -15,12 +15,10 @@ filesets_ecearth = esgf_query(
     source = NULL,
     variant = NULL,
     experiment = c("historical"),
-    frequency = c("mon", "ssp585"),
+    frequency = c("mon"),
     resolution = NULL, # null means all, probably should change that
     type = "File"
 )
-
-filesets_ecearth=filesets_ecearth[data_node == "esgf.ichec.ie"][c(1,2)]
 
 filesets_2 = esgf_query(
     project = c("CMIP5"),
