@@ -1,3 +1,13 @@
+inputs = "data/pr/EC-Earth3-Veg/historical/r10i1p1f1/*.nc"
+output = "data/pr/EC-Earth3-Veg/historical/r10i1p1f1/EC-Earth3-Veg_historical_r10i1p1f1_Amon_pr.nc"
+system(paste("cdo mergetime", inputs, output))
+system2("cdo", args = c("mergetime", inputs, output))
+
+filesets_2
+create_fileset_destinations(filesets_2)
+unique(filesets_2$dataset_id)
+mly = split(filesets_2$file_paths, filesets_2$dataset_id)
+
 merge_files_in_fileset_db = function(fileset_db) {
 
   file_name_from_dataset_id = function(dataset_id) {
